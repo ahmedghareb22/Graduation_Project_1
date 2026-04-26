@@ -49,7 +49,21 @@ public class GeminiManager : MonoBehaviour
         StartCoroutine(DelayedGreeting());
     }
 
-    void LateUpdate()
+    void Update()
+    {
+        HandleLipSync();
+
+        // إرسال الرسالة بـ Enter فقط لو الـ Input متاح ومش شغالين حالياً
+        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
+        {
+            if (userInputField.interactable && !string.IsNullOrEmpty(userInputField.text) && !isTyping)
+            {
+                OnSendClick();
+            }
+        }
+    }
+
+    void HandleLipSync()
     {
         if (characterMesh == null || audioSource == null) return;
         float targetWeight = 0;
@@ -75,6 +89,7 @@ public class GeminiManager : MonoBehaviour
     public void OnSendClick()
     {
         if (isTyping || string.IsNullOrEmpty(userInputField.text)) return;
+
         string msg = userInputField.text.Trim();
         var tour = GetComponent<TourManager>();
 
@@ -82,17 +97,27 @@ public class GeminiManager : MonoBehaviour
         userInputField.text = "";
         UpdateScroll();
 
-        // فحص الأوامر
+        // فحص أوامر الحركة (يلا بينا، التالي، الخ)
         if (msg.Contains("يلا") || msg.Contains("ابدأ") || msg.Contains("بعده") || msg.Contains("التالي"))
         {
-            if (tour != null) { if (!tour.tourStarted) tour.StartTour(); else tour.MoveToNext(); }
+            if (tour != null)
+            {
+                // هننادي على الدالة اللي بتشيك لو حورس مشغول ولا لا
+                tour.HandleNavigationInput();
+            }
         }
-        else { StartCoroutine(PostToGemini(msg)); }
+        else
+        {
+            StartCoroutine(PostToGemini(msg));
+        }
     }
 
     IEnumerator PostToGemini(string prompt)
     {
         isTyping = true;
+        // قفل الـ InputField أثناء التفكير والرد
+        userInputField.interactable = false;
+
         string loading = $"\n<color=#FFFF00><b>{FixArabic("حورس:")}</b></color> {FixArabic("يفكر...")}";
         chatDisplay.text += loading; UpdateScroll();
 
@@ -116,10 +141,15 @@ public class GeminiManager : MonoBehaviour
             }
         }
         isTyping = false;
+        // فتح الـ InputField بعد انتهاء الرد (يتم التحكم فيه داخل SpeakAndType أيضاً للأمان)
     }
 
     public IEnumerator SpeakAndType(string text, bool playAnim = true, AudioClip forcedClip = null)
     {
+        // 1. قفل الـ Input Field والـ Button مع بعض
+        if (userInputField != null) userInputField.interactable = false;
+        if (sendButton != null) sendButton.interactable = false; // قفل زرار الإرسال
+
         if (characterAnimator != null && playAnim) characterAnimator.SetBool("isSpeaking", true);
         StartCoroutine(TypeText(text));
 
@@ -137,7 +167,16 @@ public class GeminiManager : MonoBehaviour
         else { yield return StartCoroutine(PlayVoice(text)); }
 
         while (audioSource.isPlaying) yield return null;
+
         if (characterAnimator != null) characterAnimator.SetBool("isSpeaking", false);
+
+        // 2. فتح الـ Input Field والـ Button وتركيز الماوس
+        if (userInputField != null)
+        {
+            userInputField.interactable = true;
+            userInputField.ActivateInputField();
+        }
+        if (sendButton != null) sendButton.interactable = true; // فتح الزرار تاني
     }
 
     IEnumerator PlayVoice(string text)
@@ -172,6 +211,13 @@ public class GeminiManager : MonoBehaviour
             UpdateScroll();
             yield return new WaitForSeconds(0.05f);
         }
+    }
+
+    // دالة بترجع true لو حورس بيتكلم أو لسه بيفكر في الرد
+    public bool IsCharacterBusy()
+    {
+        // مشغول لو الأوديو شغال أو لو لسه بيكتب (isTyping)
+        return (audioSource != null && audioSource.isPlaying) || isTyping;
     }
 
     string FixArabic(string input) => ArabicFixer.Fix(input, false, true);

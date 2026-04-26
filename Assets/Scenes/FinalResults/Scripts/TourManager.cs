@@ -24,7 +24,7 @@ public class TourManager : MonoBehaviour
 
     private int currentIndex = 0;
     private bool isArrived = false;
-    private bool canCheckArrival = false; // لمنع الكاميرا من التبديل قبل الحركة
+    private bool canCheckArrival = false;
     public bool tourStarted = false;
 
     void Start()
@@ -32,6 +32,9 @@ public class TourManager : MonoBehaviour
         gemini = GetComponent<GeminiManager>();
         ResetAllCameras();
         if (followCam != null) followCam.Priority = 20;
+
+        // خلي الـ Stopping Distance كبير شوية (2 متر مثلاً) عشان نضمن الوصول
+        if (agent != null) agent.stoppingDistance = 0.5f;
     }
 
     void ResetAllCameras()
@@ -49,25 +52,68 @@ public class TourManager : MonoBehaviour
 
     void Update()
     {
-        if (agent == null || !tourStarted) return;
+        if (agent == null) return;
 
+        if (Input.GetKeyDown(KeyCode.LeftControl))
+        {
+            HandleNavigationInput();
+        }
+        // التعديل هنا: لو مش بيتحرك، خليه يبص للكاميرا دايماً حتى لو الجولة خلصت
+        if (agent.velocity.magnitude < 0.1f)
+        {
+            LookAtCamera();
+        }
+
+        if (!tourStarted) return;
+        UpdateMovementLogic();
+    }
+
+    public void HandleNavigationInput()
+    {
+        if (gemini != null && gemini.IsCharacterBusy())
+        {
+            Debug.LogWarning("التحرك مرفوض: حورس لسه بيتكلم.");
+            return;
+        }
+
+        if (!tourStarted) { StartTour(); return; }
+
+        // لو ضغطت "يلا" وهو واقف فعلياً بس الكود معلق، هنساعده هنا
+        float dist = Vector3.Distance(transform.position, statueList[currentIndex].targetPoint.position);
+        if (isArrived || dist <= agent.stoppingDistance + 0.5f)
+        {
+            MoveToNext();
+        }
+        else
+        {
+            Debug.LogWarning("التحرك مرفوض: حورس لسه موصلش للمكان.");
+        }
+    }
+
+    void UpdateMovementLogic()
+    {
         animator.SetFloat("Speed", agent.velocity.magnitude);
 
-        // التحكم في الدوران أثناء المشي
         if (agent.velocity.magnitude > 0.1f)
         {
             Quaternion lookRot = Quaternion.LookRotation(agent.velocity.normalized);
             transform.rotation = Quaternion.Slerp(transform.rotation, lookRot, Time.deltaTime * 5f);
         }
-        else if (isArrived) { LookAtCamera(); }
+        else if (isArrived || agent.isStopped)
+        {
+            // نداء دالة البص للكاميرا اللي طلبتها
+            LookAtCamera();
+        }
 
-        // التحقق من الوصول (فقط إذا كان مسموحاً لنا بالتحقق)
         if (canCheckArrival && !isArrived && !agent.pathPending)
         {
-            if (agent.remainingDistance <= agent.stoppingDistance)
+            // تشييك إضافي بالمسافة المباشرة (أضمن من remainingDistance)
+            float dist = Vector3.Distance(transform.position, statueList[currentIndex].targetPoint.position);
+
+            if (agent.remainingDistance <= agent.stoppingDistance || dist <= agent.stoppingDistance)
             {
                 isArrived = true;
-                canCheckArrival = false; // نوقف التحقق عشان ميتكررش
+                canCheckArrival = false;
                 StartCoroutine(TriggerStatueInfo());
             }
         }
@@ -77,85 +123,104 @@ public class TourManager : MonoBehaviour
     {
         if (currentIndex < statueList.Count)
         {
-            StopAllCoroutines(); // نوقف أي كلام أو حركات سابقة
+            StopAllCoroutines();
             isArrived = false;
             canCheckArrival = false;
-
             agent.isStopped = false;
             ResetAllCameras();
             if (followCam != null) followCam.Priority = 20;
 
             agent.SetDestination(statueList[currentIndex].targetPoint.position);
-
-            // ننتظر نصف ثانية قبل السماح بالتحقق من الوصول
             StartCoroutine(MovementCooldown());
         }
     }
 
     IEnumerator MovementCooldown()
     {
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(1f);
         canCheckArrival = true;
     }
 
     IEnumerator TriggerStatueInfo()
     {
         agent.isStopped = true;
-
-        // تفعيل كاميرا التمثال
         if (statueList[currentIndex].statueCam != null)
             statueList[currentIndex].statueCam.Priority = 30;
 
         yield return StartCoroutine(FacePlayer());
 
-        if (currentIndex < statueList.Count)
-        {
-            StatueData currentData = statueList[currentIndex].data;
-            gemini.currentStatueContext = currentData.info;
+        StatueData currentData = statueList[currentIndex].data;
+        gemini.currentStatueContext = currentData.info;
 
-            string speech = $"إحنا دلوقتي قدام {currentData.statueName}. {currentData.info}";
-            // نظام الميكس يشتغل هنا
-            yield return StartCoroutine(gemini.SpeakAndType(speech, true, currentData.preRecordedAudio));
+        string speech = $"إحنا دلوقتي قدام {currentData.statueName}. {currentData.info}";
+        yield return StartCoroutine(gemini.SpeakAndType(speech, true, currentData.preRecordedAudio));
 
-            yield return StartCoroutine(gemini.SpeakAndType("لو حابب تعرف أكتر عن التمثال ده أنا موجود، أو قولي 'يلا بينا' عشان نشوف اللي بعده"));
-        }
+        yield return StartCoroutine(gemini.SpeakAndType("لو حابب تعرف أكتر عن التمثال ده أنا موجود، أو قولي 'يلا بينا' عشان نشوف اللي بعده"));
     }
 
     public void MoveToNext()
     {
-        if (!isArrived) return; // منع التبديل وهو في الطريق
-
         currentIndex++;
-        if (currentIndex < statueList.Count) GoToStatue();
+        if (currentIndex < statueList.Count)
+        {
+            GoToStatue();
+        }
         else
         {
-            ResetAllCameras();
-            if (followCam != null) followCam.Priority = 20;
-            StartCoroutine(gemini.SpeakAndType("لحد هنا وجولتنا خلصت انهارده أتمني تكون استمتعت. نورتني!"));
-            tourStarted = false;
+            // بدل ما نقفل الجولة فوراً، هنشغل كوروتين النهاية
+            StartCoroutine(EndTourSequence());
         }
     }
+
+    IEnumerator EndTourSequence()
+    {
+        Debug.Log("جاري إنهاء الجولة...");
+
+        // 1. نرجع الكاميرا الأساسية
+        ResetAllCameras();
+        if (followCam != null) followCam.Priority = 20;
+
+        // 2. يلف يبص لك الأول قبل ما يتكلم
+        yield return StartCoroutine(FacePlayer());
+
+        // 3. يقول جملة النهاية وهو باصص لك
+        yield return StartCoroutine(gemini.SpeakAndType("لحد هنا وجولتنا خلصت انهارده أتمني تكون استمتعت. نورتني!"));
+
+        // 4. نقفل الجولة رسمياً
+        tourStarted = false;
+        isArrived = false;
+    }
+
+
+    // --- الدوال اللي رجعتها لك عشان يبص للكاميرا ---
 
     void LookAtCamera()
     {
         if (Camera.main == null) return;
-        Transform target = Camera.main.transform;
-        Vector3 dir = (target.position - transform.position).normalized;
-        dir.y = 0;
-        if (dir != Vector3.zero) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * 2f);
+        Vector3 direction = Camera.main.transform.position - transform.position;
+        direction.y = 0; // عشان ميميلش بجسمه
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 3f);
+        }
     }
 
     IEnumerator FacePlayer()
     {
         if (Camera.main == null) yield break;
-        Transform target = Camera.main.transform;
-        float timeout = 2f;
-        while (Vector3.Angle(transform.forward, (target.position - transform.position).normalized) > 5f && timeout > 0)
+        float duration = 1.5f;
+        float elapsed = 0f;
+        while (elapsed < duration)
         {
-            Vector3 dir = (target.position - transform.position).normalized;
-            dir.y = 0;
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(dir), 180f * Time.deltaTime);
-            timeout -= Time.deltaTime;
+            Vector3 direction = Camera.main.transform.position - transform.position;
+            direction.y = 0;
+            if (direction != Vector3.zero)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, elapsed / duration);
+            }
+            elapsed += Time.deltaTime;
             yield return null;
         }
     }
