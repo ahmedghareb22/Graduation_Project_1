@@ -3,6 +3,8 @@ using UnityEngine.AI;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Cinemachine;
+using UnityEngine.SceneManagement;
+
 
 [System.Serializable]
 public class StatueEntry
@@ -18,6 +20,11 @@ public class TourManager : MonoBehaviour
     public Animator animator;
     private GeminiManager gemini;
 
+    [Header("UI Panels")]
+    public GameObject startPanel;
+    public GameObject endPanel;
+    public GameObject loadingScreen;
+
     [Header("Cameras")]
     public CinemachineCamera followCam;
     public List<StatueEntry> statueList = new List<StatueEntry>();
@@ -29,12 +36,20 @@ public class TourManager : MonoBehaviour
 
     void Start()
     {
+        // 1. إظهار لوحة البداية فقط
+        if (startPanel != null) startPanel.SetActive(true);
+        if (endPanel != null) endPanel.SetActive(false);
+
+        tourStarted = false;
+
         gemini = GetComponent<GeminiManager>();
         ResetAllCameras();
         if (followCam != null) followCam.Priority = 20;
 
-        // خلي الـ Stopping Distance كبير شوية (2 متر مثلاً) عشان نضمن الوصول
-        if (agent != null) agent.stoppingDistance = 0.5f;
+        if (agent != null) agent.stoppingDistance = 0.1f;
+
+        // تأكد أن العميل متوقف في البداية تماماً
+        if (agent != null) agent.isStopped = true;
     }
 
     void ResetAllCameras()
@@ -43,11 +58,45 @@ public class TourManager : MonoBehaviour
             if (entry.statueCam != null) entry.statueCam.Priority = 10;
     }
 
+    // الدالة الأصلية للتحريك (تبقي كما هي ولكن تُستدعى بعد التحية)
     public void StartTour()
     {
         tourStarted = true;
         currentIndex = 0;
         GoToStatue();
+    }
+
+    // --- الجزء الجديد: تسلسل الترحيب قبل الحركة ---
+    IEnumerator InitialGreetingSequence()
+    {
+        // 1. لف حورس ليبص للكاميرا/اللاعب قبل الكلام
+        yield return StartCoroutine(FacePlayer());
+
+        // 2. تشغيل حركة الترحيب (اللوحة)
+        if (animator != null) animator.SetTrigger("Wave");
+
+        yield return new WaitForSeconds(3.0f);
+        // 2. جملة التحية الافتتاحية (تعدلها كما تحب)
+        yield return StartCoroutine(gemini.SpeakAndType("أهلاً بك يا صديقي! أنا حورس، مرشدك السياحي. جاهز نبدأ الجولة؟"));
+
+        // 4. تفعيل وضع الجولة وتصفير العداد لكن "بدون" أمر حركة
+        tourStarted = true;
+        currentIndex = 0;
+        isArrived = false;
+        canCheckArrival = false;
+
+        Debug.Log("حورس مستعد، في انتظار أمر التحرك (يلا بينا أو Ctrl)");
+
+        // 3. الآن فقط تبدأ الجولة الفعلية والحركة لأول تمثال
+        //StartTour();
+    }
+
+    // تعديل زرار البداية
+    public void OnClickStartTour()
+    {
+        if (startPanel != null) startPanel.SetActive(false);
+        // بدل ما نبدأ الجولة فوراً، هنبدأ كوروتين التحية
+        StartCoroutine(InitialGreetingSequence());
     }
 
     void Update()
@@ -58,7 +107,7 @@ public class TourManager : MonoBehaviour
         {
             HandleNavigationInput();
         }
-        // التعديل هنا: لو مش بيتحرك، خليه يبص للكاميرا دايماً حتى لو الجولة خلصت
+
         if (agent.velocity.magnitude < 0.1f)
         {
             LookAtCamera();
@@ -68,6 +117,7 @@ public class TourManager : MonoBehaviour
         UpdateMovementLogic();
     }
 
+    // --- تعديل دالة التحكم للتعامل مع بداية الرحلة ---
     public void HandleNavigationInput()
     {
         if (gemini != null && gemini.IsCharacterBusy())
@@ -76,9 +126,18 @@ public class TourManager : MonoBehaviour
             return;
         }
 
-        if (!tourStarted) { StartTour(); return; }
+        if (!tourStarted) return; // لا تسمح بالتحكم قبل بداية الجولة رسمياً
 
-        // لو ضغطت "يلا" وهو واقف فعلياً بس الكود معلق، هنساعده هنا
+        // الحالة الجديدة: لو إحنا في البداية خالص ولسه متحركناش لأول تمثال
+        // بنعرف ده لو currentIndex = 0 وحورس مش بيتحرك ولسه موصلش (isArrived false)
+        if (currentIndex == 0 && !isArrived && agent.velocity.magnitude < 0.1f && !canCheckArrival)
+        {
+            Debug.Log("بدء التحرك لأول تمثال...");
+            GoToStatue();
+            return;
+        }
+
+        // المنطق الطبيعي للانتقال بين التماثيل
         float dist = Vector3.Distance(transform.position, statueList[currentIndex].targetPoint.position);
         if (isArrived || dist <= agent.stoppingDistance + 0.5f)
         {
@@ -86,7 +145,7 @@ public class TourManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("التحرك مرفوض: حورس لسه موصلش للمكان.");
+            Debug.LogWarning("التحرك مرفوض: حورس لسه موصلش للمكان الحالي.");
         }
     }
 
@@ -101,15 +160,12 @@ public class TourManager : MonoBehaviour
         }
         else if (isArrived || agent.isStopped)
         {
-            // نداء دالة البص للكاميرا اللي طلبتها
             LookAtCamera();
         }
 
         if (canCheckArrival && !isArrived && !agent.pathPending)
         {
-            // تشييك إضافي بالمسافة المباشرة (أضمن من remainingDistance)
             float dist = Vector3.Distance(transform.position, statueList[currentIndex].targetPoint.position);
-
             if (agent.remainingDistance <= agent.stoppingDistance || dist <= agent.stoppingDistance)
             {
                 isArrived = true;
@@ -167,38 +223,30 @@ public class TourManager : MonoBehaviour
         }
         else
         {
-            // بدل ما نقفل الجولة فوراً، هنشغل كوروتين النهاية
             StartCoroutine(EndTourSequence());
         }
     }
 
     IEnumerator EndTourSequence()
     {
-        Debug.Log("جاري إنهاء الجولة...");
-
-        // 1. نرجع الكاميرا الأساسية
         ResetAllCameras();
         if (followCam != null) followCam.Priority = 20;
 
-        // 2. يلف يبص لك الأول قبل ما يتكلم
         yield return StartCoroutine(FacePlayer());
 
-        // 3. يقول جملة النهاية وهو باصص لك
         yield return StartCoroutine(gemini.SpeakAndType("لحد هنا وجولتنا خلصت انهارده أتمني تكون استمتعت. نورتني!"));
 
-        // 4. نقفل الجولة رسمياً
         tourStarted = false;
         isArrived = false;
+
+        if (endPanel != null) endPanel.SetActive(true);
     }
-
-
-    // --- الدوال اللي رجعتها لك عشان يبص للكاميرا ---
 
     void LookAtCamera()
     {
         if (Camera.main == null) return;
         Vector3 direction = Camera.main.transform.position - transform.position;
-        direction.y = 0; // عشان ميميلش بجسمه
+        direction.y = 0;
         if (direction != Vector3.zero)
         {
             Quaternion targetRotation = Quaternion.LookRotation(direction);
@@ -223,5 +271,38 @@ public class TourManager : MonoBehaviour
             elapsed += Time.deltaTime;
             yield return null;
         }
+    }
+
+
+    
+ 
+
+    public void RestartTour()
+    {
+        StartCoroutine(LoadAsynchronously());
+    }
+
+    IEnumerator LoadAsynchronously()
+    {
+        // 1. نبدأ تحميل المشهد في الخلفية
+        AsyncOperation operation = SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().name);
+
+        // 2. نظهر شاشة التحميل (البردي أو اللوحة اللي صممتها)
+        if (loadingScreen != null)
+            loadingScreen.SetActive(true);
+
+        // 3. الجزء اللي كان ناقص: حلقة تكرار بتخلي الكود "يستنى" طول ما التحميل لسه مخلصش
+        while (!operation.isDone)
+        {
+            // هنا ممكن تحسب نسبة التحميل لو عندك ProgressBar
+            // float progress = Mathf.Clamp01(operation.progress / 0.9f);
+
+            yield return null; // استنى للفريم الجاي وكرر التشييك
+        }
+    }
+
+    public void QuitGame()
+    {
+        Application.Quit();
     }
 }

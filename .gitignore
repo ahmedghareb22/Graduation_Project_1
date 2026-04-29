@@ -101,3 +101,7 @@ InitTestScene*.unity*
 # OS
 .DS_Store
 Thumbs.db
+
+#Api key Data
+Assets\Scenes\FinalResults\Scripts\ApiSettingsData.asset
+Assets\Scenes\FinalResults\Scripts\ApiSettingsData.asset.meta

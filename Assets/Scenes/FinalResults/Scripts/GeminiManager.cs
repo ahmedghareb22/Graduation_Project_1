@@ -18,8 +18,12 @@ public class StaticVoice { public string textID; public AudioClip clip; }
 public class GeminiManager : MonoBehaviour
 {
     [Header("API Keys")]
-    public string geminiApiKey = "";
-    public string elevenLabsApiKey = "";
+    public ApiSettings apiData; // اسحب الملف هنا من الـ Inspector
+
+    // تعريف المتغيرات هنا عشان الكلاس كله يشوفها
+    private string geminiApiKey;
+    private string elevenLabsApiKey;
+
     public string voiceId = "";
     public AudioSource audioSource;
 
@@ -44,9 +48,20 @@ public class GeminiManager : MonoBehaviour
 
     void Start()
     {
+        // هنا بنجيب القيم من ملف الـ ScriptableObject اللي عملناه
+        if (apiData != null)
+        {
+            geminiApiKey = apiData.geminiApiKey;
+            elevenLabsApiKey = apiData.elevenLabsApiKey;
+        }
+        else
+        {
+            Debug.LogError("يا بطل، إنت نسيت تسحب ملف الـ ApiSettings في الـ Inspector!");
+        }
+
         if (sendButton != null) sendButton.onClick.AddListener(OnSendClick);
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
-        StartCoroutine(DelayedGreeting());
+        //StartCoroutine(DelayedGreeting());
     }
 
     void Update()
