@@ -18,9 +18,8 @@ public class StaticVoice { public string textID; public AudioClip clip; }
 public class GeminiManager : MonoBehaviour
 {
     [Header("API Keys")]
-    public ApiSettings apiData; // اسحب الملف هنا من الـ Inspector
+    public ApiSettings apiData;
 
-    // تعريف المتغيرات هنا عشان الكلاس كله يشوفها
     private string geminiApiKey;
     private string elevenLabsApiKey;
 
@@ -48,27 +47,25 @@ public class GeminiManager : MonoBehaviour
 
     void Start()
     {
-        // هنا بنجيب القيم من ملف الـ ScriptableObject اللي عملناه
         if (apiData != null)
         {
             geminiApiKey = apiData.geminiApiKey;
             elevenLabsApiKey = apiData.elevenLabsApiKey;
+            Debug.Log("<color=green>GeminiManager: تم تحميل الـ API Keys بنجاح.</color>");
         }
         else
         {
-            Debug.LogError("يا بطل، إنت نسيت تسحب ملف الـ ApiSettings في الـ Inspector!");
+            Debug.LogError("GeminiManager: ملف الـ ApiSettings ناقص في الـ Inspector!");
         }
 
         if (sendButton != null) sendButton.onClick.AddListener(OnSendClick);
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
-        //StartCoroutine(DelayedGreeting());
     }
 
     void Update()
     {
         HandleLipSync();
 
-        // إرسال الرسالة بـ Enter فقط لو الـ Input متاح ومش شغالين حالياً
         if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
         {
             if (userInputField.interactable && !string.IsNullOrEmpty(userInputField.text) && !isTyping)
@@ -94,32 +91,23 @@ public class GeminiManager : MonoBehaviour
         characterMesh.SetBlendShapeWeight(mouthBlendShapeIndex, Mathf.Lerp(current, targetWeight, Time.deltaTime * lerpSpeed));
     }
 
-    IEnumerator DelayedGreeting()
-    {
-        yield return new WaitForSeconds(2f);
-        if (characterAnimator != null) characterAnimator.SetTrigger("Wave");
-        yield return StartCoroutine(SpeakAndType("أهلاً بك يا صديقي! أنا حورس، مرشدك السياحي. جاهز نبدأ الجولة؟", false));
-    }
-
     public void OnSendClick()
     {
         if (isTyping || string.IsNullOrEmpty(userInputField.text)) return;
 
         string msg = userInputField.text.Trim();
+        Debug.Log($"GeminiManager: المستخدم أرسل رسالة: {msg}");
+
         var tour = GetComponent<TourManager>();
 
         chatDisplay.text += $"\n<color=#00FF00><b>{FixArabic("أنت:")}</b></color> {FixArabic(msg)}";
         userInputField.text = "";
         UpdateScroll();
 
-        // فحص أوامر الحركة (يلا بينا، التالي، الخ)
         if (msg.Contains("يلا") || msg.Contains("ابدأ") || msg.Contains("بعده") || msg.Contains("التالي"))
         {
-            if (tour != null)
-            {
-                // هننادي على الدالة اللي بتشيك لو حورس مشغول ولا لا
-                tour.HandleNavigationInput();
-            }
+            Debug.Log("GeminiManager: تم اكتشاف أمر حركة، التوجه للـ TourManager.");
+            if (tour != null) tour.HandleNavigationInput();
         }
         else
         {
@@ -130,7 +118,6 @@ public class GeminiManager : MonoBehaviour
     IEnumerator PostToGemini(string prompt)
     {
         isTyping = true;
-        // قفل الـ InputField أثناء التفكير والرد
         userInputField.interactable = false;
 
         string loading = $"\n<color=#FFFF00><b>{FixArabic("حورس:")}</b></color> {FixArabic("يفكر...")}";
@@ -138,7 +125,11 @@ public class GeminiManager : MonoBehaviour
 
         string context = $"أنت حورَس، مرشد سياحي مصري. المكان: ({currentStatueContext}). رد بلهجة مصرية خفيفة جداً ومختصرة.";
         GeminiRequest req = new GeminiRequest { contents = new Content[] { new Content { parts = new Part[] { new Part { text = context + " السؤال: " + prompt } } } } };
+
+        // ملاحظة: تأكد من إصدار الموديل (مثلاً gemini-1.5-flash)
         string url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey;
+
+        Debug.Log($"GeminiManager: جاري إرسال الطلب لـ Gemini...");
 
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
@@ -146,69 +137,125 @@ public class GeminiManager : MonoBehaviour
             request.uploadHandler = new UploadHandlerRaw(body);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
+
             yield return request.SendWebRequest();
 
             chatDisplay.text = chatDisplay.text.Replace(loading, "");
+
             if (request.result == UnityWebRequest.Result.Success)
             {
-                GeminiResponse resp = JsonUtility.FromJson<GeminiResponse>(request.downloadHandler.text);
-                yield return StartCoroutine(SpeakAndType(resp.candidates[0].content.parts[0].text));
+                Debug.Log("GeminiManager: استجابة Gemini وصلت بنجاح.");
+
+                string reply = "";
+                bool parseSuccess = false;
+
+                try
+                {
+                    GeminiResponse resp = JsonUtility.FromJson<GeminiResponse>(request.downloadHandler.text);
+                    reply = resp.candidates[0].content.parts[0].text;
+                    parseSuccess = true;
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"GeminiManager: فشل في معالجة الـ JSON. الخطأ: {e.Message}");
+                }
+
+                // الـ yield return هنا أصبح خارج الـ try-catch فسيتم قبوله
+                if (parseSuccess)
+                {
+                    Debug.Log($"GeminiManager: رد حورس: {reply}");
+                    yield return StartCoroutine(SpeakAndType(reply));
+                }
+            }
+            else
+            {
+                Debug.LogError($"GeminiManager: خطأ في طلب Gemini! الكود: {request.responseCode} - الخطأ: {request.error}");
             }
         }
         isTyping = false;
-        // فتح الـ InputField بعد انتهاء الرد (يتم التحكم فيه داخل SpeakAndType أيضاً للأمان)
+        userInputField.interactable = true; // نفتح الإدخال مجدداً في حال حدوث خطأ
     }
-
+    
     public IEnumerator SpeakAndType(string text, bool playAnim = true, AudioClip forcedClip = null)
     {
-        // 1. قفل الـ Input Field والـ Button مع بعض
         if (userInputField != null) userInputField.interactable = false;
-        if (sendButton != null) sendButton.interactable = false; // قفل زرار الإرسال
+        if (sendButton != null) sendButton.interactable = false;
 
         if (characterAnimator != null && playAnim) characterAnimator.SetBool("isSpeaking", true);
         StartCoroutine(TypeText(text));
 
         AudioClip clipToPlay = null;
-        if (forcedClip != null) clipToPlay = forcedClip;
+        if (forcedClip != null)
+        {
+            clipToPlay = forcedClip;
+            Debug.Log("GeminiManager: استخدام ملف صوتي محدد مسبقاً (Forced Clip).");
+        }
         else
         {
             foreach (var sv in staticVoices)
             {
-                if (text.Trim() == sv.textID.Trim() || text.Contains(sv.textID)) { clipToPlay = sv.clip; break; }
+                if (text.Trim() == sv.textID.Trim() || text.Contains(sv.textID))
+                {
+                    clipToPlay = sv.clip;
+                    Debug.Log($"GeminiManager: تم العثور على صوت مسجل مسبقاً للكلمة: {sv.textID}");
+                    break;
+                }
             }
         }
 
-        if (clipToPlay != null) { audioSource.clip = clipToPlay; audioSource.Play(); }
-        else { yield return StartCoroutine(PlayVoice(text)); }
+        if (clipToPlay != null)
+        {
+            audioSource.clip = clipToPlay;
+            audioSource.Play();
+        }
+        else
+        {
+            Debug.Log("GeminiManager: لا يوجد صوت مسجل، جاري طلب الصوت من ElevenLabs...");
+            yield return StartCoroutine(PlayVoice(text));
+        }
 
         while (audioSource.isPlaying) yield return null;
 
         if (characterAnimator != null) characterAnimator.SetBool("isSpeaking", false);
 
-        // 2. فتح الـ Input Field والـ Button وتركيز الماوس
         if (userInputField != null)
         {
             userInputField.interactable = true;
             userInputField.ActivateInputField();
         }
-        if (sendButton != null) sendButton.interactable = true; // فتح الزرار تاني
+        if (sendButton != null) sendButton.interactable = true;
     }
 
     IEnumerator PlayVoice(string text)
     {
+        if (string.IsNullOrEmpty(voiceId))
+        {
+            Debug.LogError("GeminiManager: الـ Voice ID فاضي! مش هعرف أنادي ElevenLabs.");
+            yield break;
+        }
+
         string url = $"https://api.elevenlabs.io/v1/text-to-speech/{voiceId}";
         ElevenLabsRequest req = new ElevenLabsRequest { text = text };
+
         using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
         {
             request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(req)));
             request.downloadHandler = new DownloadHandlerAudioClip(url, AudioType.MPEG);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("xi-api-key", elevenLabsApiKey);
+
             yield return request.SendWebRequest();
+
             if (request.result == UnityWebRequest.Result.Success)
             {
+                Debug.Log("GeminiManager: تم تحميل الصوت من ElevenLabs بنجاح.");
                 audioSource.clip = DownloadHandlerAudioClip.GetContent(request);
                 audioSource.Play();
+            }
+            else
+            {
+                Debug.LogError($"GeminiManager: خطأ في ElevenLabs! الكود: {request.responseCode} - الخطأ: {request.error}");
+                Debug.LogError($"الرد: {request.downloadHandler.text}");
             }
         }
     }
@@ -228,12 +275,7 @@ public class GeminiManager : MonoBehaviour
         }
     }
 
-    // دالة بترجع true لو حورس بيتكلم أو لسه بيفكر في الرد
-    public bool IsCharacterBusy()
-    {
-        // مشغول لو الأوديو شغال أو لو لسه بيكتب (isTyping)
-        return (audioSource != null && audioSource.isPlaying) || isTyping;
-    }
+    public bool IsCharacterBusy() => (audioSource != null && audioSource.isPlaying) || isTyping;
 
     string FixArabic(string input) => ArabicFixer.Fix(input, false, true);
     void UpdateScroll() { Canvas.ForceUpdateCanvases(); if (scrollRect != null) scrollRect.verticalNormalizedPosition = 0f; }
