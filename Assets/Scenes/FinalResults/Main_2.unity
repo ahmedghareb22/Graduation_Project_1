@@ -9696,7 +9696,7 @@ MonoBehaviour:
     m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
     m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
     m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
-    m_DisabledColor: {r: 0.101960786, g: 0.101960786, b: 0.101960786, a: 0.5019608}
+    m_DisabledColor: {r: 0.101960786, g: 0.101960786, b: 0.101960786, a: 1}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
   m_SpriteState:
@@ -9792,9 +9792,9 @@ RectTransform:
   - {fileID: 2082255966}
   m_Father: {fileID: 1677940980}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -103, y: 80.187}
+  m_AnchorMin: {x: 0.94652086, y: 0.0741481}
+  m_AnchorMax: {x: 0.94652086, y: 0.0741481}
+  m_AnchoredPosition: {x: 0, y: 0.18701172}
   m_SizeDelta: {x: 160, y: 124.08002}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1362925921
@@ -17790,6 +17790,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 78124484}
     m_Modifications:
+    - target: {fileID: 559559076566581718, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0.5417404
+      objectReference: {fileID: 0}
+    - target: {fileID: 559559076566581718, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0.5417404
+      objectReference: {fileID: 0}
+    - target: {fileID: 559559076566581718, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 480
+      objectReference: {fileID: 0}
+    - target: {fileID: 559559076566581718, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 193
+      objectReference: {fileID: 0}
     - target: {fileID: 1340017559892855397, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
@@ -17797,6 +17813,52 @@ PrefabInstance:
     - target: {fileID: 1542502780826193118, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 2147483647
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_text
+      value: "MOVING :-\nto move the next Statue click move button or press (left
+        CTRL key) in keyboard \nASKING :-\nwrite your question in the input field
+        and click send button or press (ENTER key) in keyboard"
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontSize
+      value: 37
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_margin.w
+      value: -370.51346
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_margin.x
+      value: -800.88806
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_margin.z
+      value: 162.37218
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontStyle
+      value: 33
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontColor.b
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontColor.g
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontColor.r
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 37
+      objectReference: {fileID: 0}
+    - target: {fileID: 2800152895909644101, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4279900698
       objectReference: {fileID: 0}
     - target: {fileID: 4274963429017259473, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
       propertyPath: m_Pivot.x
@@ -17965,6 +18027,18 @@ PrefabInstance:
     - target: {fileID: 8796612306772910175, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
       propertyPath: m_MatchWidthOrHeight
       value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 9147887713988978753, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0.82881534
+      objectReference: {fileID: 0}
+    - target: {fileID: 9147887713988978753, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0.82881534
+      objectReference: {fileID: 0}
+    - target: {fileID: 9147887713988978753, guid: 09f8c0e7dc405b2459994b026fb530d2, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 5.458191
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
