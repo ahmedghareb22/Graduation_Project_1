@@ -35,6 +35,7 @@ public class GeminiManager : MonoBehaviour
     public TextMeshProUGUI chatDisplay;
     public ScrollRect scrollRect;
     public Button sendButton;
+    public Button nextStatueButton; // السطر الجديد للزرار
 
     [Header("Lip Sync Settings")]
     public SkinnedMeshRenderer characterMesh;
@@ -59,12 +60,22 @@ public class GeminiManager : MonoBehaviour
         }
 
         if (sendButton != null) sendButton.onClick.AddListener(OnSendClick);
+        // ربط الزرار الجديد بدالة الحركة
+        if (nextStatueButton != null)
+            nextStatueButton.onClick.AddListener(() => {
+                var tour = GetComponent<TourManager>();
+                if (tour != null) tour.HandleNavigationInput();
+            });
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
     }
 
     void Update()
     {
         HandleLipSync();
+
+        // السطر الجديد: الزرار لا يعمل إلا إذا كان حورس غير مشغول
+        if (nextStatueButton != null)
+            nextStatueButton.interactable = !IsCharacterBusy();
 
         if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
         {
@@ -175,7 +186,7 @@ public class GeminiManager : MonoBehaviour
         isTyping = false;
         userInputField.interactable = true; // نفتح الإدخال مجدداً في حال حدوث خطأ
     }
-    
+
     public IEnumerator SpeakAndType(string text, bool playAnim = true, AudioClip forcedClip = null)
     {
         if (userInputField != null) userInputField.interactable = false;

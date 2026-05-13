@@ -117,27 +117,25 @@ public class TourManager : MonoBehaviour
         UpdateMovementLogic();
     }
 
-    // --- تعديل دالة التحكم للتعامل مع بداية الرحلة ---
     public void HandleNavigationInput()
     {
+        // 1. فحص لو حورس مشغول (بيتكلم أو بيكتب)
         if (gemini != null && gemini.IsCharacterBusy())
         {
             Debug.LogWarning("التحرك مرفوض: حورس لسه بيتكلم.");
             return;
         }
 
-        if (!tourStarted) return; // لا تسمح بالتحكم قبل بداية الجولة رسمياً
-
-        // الحالة الجديدة: لو إحنا في البداية خالص ولسه متحركناش لأول تمثال
-        // بنعرف ده لو currentIndex = 0 وحورس مش بيتحرك ولسه موصلش (isArrived false)
-        if (currentIndex == 0 && !isArrived && agent.velocity.magnitude < 0.1f && !canCheckArrival)
+        // 2. حالة البداية: لو لسه في مرحلة الترحيب ومتحركناش
+        if (!tourStarted || (currentIndex == 0 && !isArrived && agent.velocity.magnitude < 0.1f && !canCheckArrival))
         {
             Debug.Log("بدء التحرك لأول تمثال...");
+            tourStarted = true;
             GoToStatue();
             return;
         }
 
-        // المنطق الطبيعي للانتقال بين التماثيل
+        // 3. المنطق الطبيعي للانتقال بين التماثيل
         float dist = Vector3.Distance(transform.position, statueList[currentIndex].targetPoint.position);
         if (isArrived || dist <= agent.stoppingDistance + 0.5f)
         {
@@ -274,8 +272,8 @@ public class TourManager : MonoBehaviour
     }
 
 
-    
- 
+
+
 
     public void RestartTour()
     {
